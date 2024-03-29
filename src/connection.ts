@@ -137,7 +137,7 @@ export class SecureConnection extends Connection {
     const ca = options.ca;
     const caContent = options.ca_content;
     const sslPassphrase = options.ssl_passphrase;
-    const rejectUnauthorized = options.rejectUnauthorized;
+    const rejectUnauthorized = options.rejectUnauthorized?true:false;
 
     const secureContextOptions = {
       key: sslKey
