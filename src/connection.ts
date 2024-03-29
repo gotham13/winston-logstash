@@ -5,19 +5,19 @@
  *
  */
 
-import { Socket } from 'net'
-import { readFileSync } from 'fs'
-import tls from 'tls';
-import { WinstonModuleTransportOptions } from 'winston';
-import { LogstashTransportSSLOptions } from './types';
-import { EventEmitter } from 'events';
+import { Socket } from "net";
+import { readFileSync } from "fs";
+import tls from "tls";
+import { WinstonModuleTransportOptions } from "winston";
+import { LogstashTransportSSLOptions } from "./types";
+import { EventEmitter } from "events";
 
 export enum ConnectionActions {
   Initializing = "Initializing",
   Connecting = "Connecting",
   Closing = "Closing",
   Tranferring = "Transferring",
-  HandlingError = "HandlingError"
+  HandlingError = "HandlingError",
 }
 
 export enum ConnectionEvents {
@@ -26,7 +26,7 @@ export enum ConnectionEvents {
   ClosedByServer = "connection:closed:by-server",
   Error = "connection:error",
   Timeout = "connection:timeout",
-  Drain = "connection:drain"
+  Drain = "connection:drain",
 }
 
 export interface IConnection extends EventEmitter {
@@ -45,7 +45,7 @@ export abstract class Connection extends EventEmitter implements IConnection {
   constructor(options: WinstonModuleTransportOptions) {
     super();
     this.action = ConnectionActions.Initializing;
-    this.host = options?.host ?? '127.0.0.1';
+    this.host = options?.host ?? "127.0.0.1";
     this.port = options?.port ?? 28777;
   }
 
@@ -78,12 +78,11 @@ export abstract class Connection extends EventEmitter implements IConnection {
   }
 
   protected addEventListeners(socket: Socket) {
-    socket.on('drain', this.socketOnDrain.bind(this));
-    socket.once('error', this.socketOnError.bind(this));
-    socket.once('timeout', this.socketOnTimeout.bind(this));
-    socket.once('close', this.socketOnClose.bind(this));
+    socket.on("drain", this.socketOnDrain.bind(this));
+    socket.once("error", this.socketOnError.bind(this));
+    socket.once("timeout", this.socketOnTimeout.bind(this));
+    socket.once("close", this.socketOnClose.bind(this));
   }
-
 
   close() {
     this.action = ConnectionActions.Closing;
@@ -95,9 +94,9 @@ export abstract class Connection extends EventEmitter implements IConnection {
   send(message: string, writeCallback: (error?: Error) => void): boolean {
     return this.socket?.write(Buffer.from(message), writeCallback) === true;
   }
-  
+
   readyToSend(): boolean {
-    return this.socket?.readyState === 'open';
+    return this.socket?.readyState === "open";
   }
 
   connect() {
@@ -111,7 +110,7 @@ export class PlainConnection extends Connection {
     try {
       this.socket = new Socket();
       super.addEventListeners(this.socket);
-      this.socket.once('connect', super.socketOnConnect.bind(this));
+      this.socket.once("connect", super.socketOnConnect.bind(this));
       this.socket.connect(this.port, this.host);
     } catch (error) {
       this.emit(ConnectionEvents.Error, error);
@@ -123,23 +122,37 @@ export class SecureConnection extends Connection {
   private secureContextOptions: tls.ConnectionOptions;
   constructor(options: WinstonModuleTransportOptions) {
     super(options);
-    this.secureContextOptions =
-      SecureConnection.createSecureContextOptions(options as LogstashTransportSSLOptions);
+    this.secureContextOptions = SecureConnection.createSecureContextOptions(
+      options as LogstashTransportSSLOptions
+    );
   }
 
-  static createSecureContextOptions(options: LogstashTransportSSLOptions): tls.ConnectionOptions {
+  static createSecureContextOptions(
+    options: LogstashTransportSSLOptions
+  ): tls.ConnectionOptions {
     const sslKey = options.ssl_key;
     const sslCert = options.ssl_cert;
+    const sslKeyContent = options.ssl_key_content;
+    const sslCertContent = options.ssl_cert_content;
     const ca = options.ca;
+    const caContent = options.ca_content;
     const sslPassphrase = options.ssl_passphrase;
     const rejectUnauthorized = options.rejectUnauthorized;
 
     const secureContextOptions = {
-      key: sslKey && readFileSync(sslKey),
-      cert: sslCert && readFileSync(sslCert),
+      key: sslKey
+        ? readFileSync(sslKey)
+        : sslKeyContent
+        ? sslKeyContent
+        : undefined,
+      cert: sslCert
+        ? readFileSync(sslCert)
+        : sslCertContent
+        ? sslCertContent
+        : undefined,
       passphrase: sslPassphrase || undefined,
       rejectUnauthorized: rejectUnauthorized!,
-      ca: ca && readFileSync(ca)
+      ca: ca ? readFileSync(ca) : caContent ? caContent : undefined,
     };
 
     return secureContextOptions;
@@ -148,11 +161,13 @@ export class SecureConnection extends Connection {
   connect() {
     super.connect();
     try {
-      this.socket = tls.connect(this.port,
+      this.socket = tls.connect(
+        this.port,
         this.host,
-        this.secureContextOptions);
+        this.secureContextOptions
+      );
       super.addEventListeners(this.socket);
-      this.socket.once('secureConnect', super.socketOnConnect.bind(this));
+      this.socket.once("secureConnect", super.socketOnConnect.bind(this));
     } catch (error) {
       this.emit(ConnectionEvents.Error, error);
     }
